@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Paper PDFs — kept local/iCloud only, not committed (large, third-party)
+Papers/**/*.pdf
+*.pdf
+
+# Editor / OS junk
+*.swp
+*.swo
+.idea/
+*.tmp
+
+# Extraction scratch (lives in /tmp anyway, but ignore if copied in)
+*.pdf.txt
+*.pdf.txt.refs.txt
