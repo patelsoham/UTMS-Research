@@ -17,3 +17,6 @@ Papers/**/*.pdf
 # Extraction scratch (lives in /tmp anyway, but ignore if copied in)
 *.pdf.txt
 *.pdf.txt.refs.txt
+
+
+phase1_priority.md
