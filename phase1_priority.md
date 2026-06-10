@@ -11,15 +11,30 @@
 
 ### Research Problem (Current Project — Pivot)
 
-Extract actionable control signals from pretrained **video generative models** (diffusion models, or any model that predicts next frames from prior ones) by mapping the **noise vector** used during forward prediction to meaningful robotic **low-level actions** (as one example target). We target video generative models because of the **dynamics information** likely encoded in them from large-scale pretraining. If this mapping is possible, we can show that **action-labeled datasets are not strictly required**.
+> **Canonical one-liner.** *Can a **frozen, action-blind** pretrained video model's representation be read — via a **toolbox of latent-space analysis techniques** — to recover **low-level action / inverse-dynamics** structure, **without training any new action module**?*
+>
+> **What it IS:** an interpretability-first study *and* method. Build a toolbox (probing, subspace/SVD, Jacobian, trajectory-sampling, intervention) to **find and characterize** action structure inside a frozen video model, then ground it to control with minimal action labels.
+> **What it is NOT:** a new latent-action learner, a fine-tuned policy, or a generate-video-then-act system. We do **not** train or co-train Φ, and we add **no** action head.
+> **Why video models:** large-scale frame-prediction pretraining must encode environment dynamics; the open question is whether that structure is **readable** or only **entangled**.
+> **Primary deliverables:** (1) the **latent-analysis toolbox** itself; (2) an **existence result** — does action structure live in a frozen action-blind Φ, and *where*? — with control grounding as the applied payoff. A **conclusive negative is a valid result**.
 
-**Core hypothesis:** Large-scale video pretraining implicitly encodes environment dynamics. The forward-prediction noise/latent is a candidate carrier of action-relevant structure that can be decoded into low-level control.
+Extract actionable control signals from pretrained **video models** — diffusion/flow generators, autoregressive (token-based) video models, *and* non-generative predictive models (e.g. V-JEPA 2) — by recovering **inverse-dynamics / low-level action** structure from whatever **representation** the model exposes: the **conditioning noise** of a diffusion/flow model, the **latent embedding space** of a predictive model, or an **autoregressive rollout** (low-level robot actions are one headline target). The action signal need **not be directly stored** as a static vector — the method may instead **sample/traverse trajectories within the representation** and read dynamics from how those trajectories move. Developing a **toolbox of techniques for understanding that latent/representation space** — so the low-level mapping is *findable* in the first place — is itself a primary deliverable, not just a means to an end. We target video models because of the **dynamics information** likely encoded in them from large-scale pretraining. If this recovery is possible, we can show that **action-labeled datasets are not strictly required**.
+
+**Scope boundary (the novelty axis).** We target models that are **purely video models** — trained only to predict frames/representations, with **no action interface** — *not* video-model-**plus-action-conditioning** systems. This is the line that separates us from the prior cluster: Genie's Latent Action Model, V-JEPA 2-**AC**, and DreamZero's action head all *manufacture* a latent action space by training a module *on top of* the video model. We instead **discover** action structure already latent in a frozen, action-blind video model. If a model was given an action interface during training, reading actions back out is trivial and not our contribution; the claim is that the structure is recoverable from a model that **never had one**.
+
+**Core hypothesis:** Large-scale video pretraining implicitly encodes environment dynamics. That structure is **recoverable from a frozen, action-blind video model's representation** — its forward-prediction noise, latent embedding space, or autoregressive rollout — whether as a static subspace or by **sampling trajectories through the representation**, and can be decoded into low-level control *without training a new action module* (the contrast with Genie/LAPO/LAPA/V-JEPA 2-AC, which manufacture an action space rather than discover it).
 
 ### Max's Framing (Direction Note)
 
 > Yes, that's generally correct. I'd add that we want to develop a **toolbox of techniques for actually understanding the latent space** here so that we can actually find the low-level mapping. This is not trivial in and of itself.
 
-**Takeaway:** The deliverable isn't only a noise→action decoder — it's a set of **latent-space analysis techniques** (probing, structure discovery, alignment) that make the mapping findable in the first place. Interpretability of the generative latent space is a first-class research goal, not just a means to an end.
+**Takeaway:** The deliverable isn't only a noise→action decoder — it's a set of **latent-space analysis techniques** (probing, structure discovery, alignment, trajectory-sampling) that make the mapping findable in the first place. Interpretability of the generative latent space is a first-class research goal, not just a means to an end.
+
+**The two novelty axes (use this to position against Genie/LAPO/LAPA).**
+1. **Frozen vs. trained.** Genie's LAM, LAPO, LAPA, and DreamZero all *train or co-train* the world model and/or an action module. We keep Φ **frozen** and train *only* the extractor that reads structure off it.
+2. **Discover vs. manufacture.** This is the deeper axis. Genie's LAM *manufactures* an action space by construction — a VQ bottleneck + IDM/FDM trained to **create** action-like latents. We claim the structure is **already present** in a model that was **never given an action interface**, and the contribution is the **toolbox that finds and characterizes** it. In their paradigm the *trained module is the method*; in ours the *analysis is the method*.
+
+The defensible claim is the **conjunction**: *action structure is recoverable from a frozen, action-blind video model, and the contribution is the toolbox that recovers it — not a new module that builds it.* Drop "frozen" → you're Genie. Drop "action-blind" → you're trivially reading an exposed latent-action port. Drop "toolbox/discover" → you're just another latent-action learner. (Caveat: Genie's LAM is also your **strongest evidence the premise is true** — action structure *is* recoverable from video — so position it as proof-of-premise, not as a method you're refuting.)
 
 ### Open Questions
 - Which latent/noise component (initial noise, intermediate denoising states, cross-frame deltas) carries action-relevant information?
@@ -107,7 +122,7 @@ All four live in `Papers/Understanding_Noise/`. Read in this order; the first tw
    Survey defining **WAMs**: embodied models unifying predictive state modeling + action generation (joint distribution over future states *and* actions). Taxonomy of **Cascaded vs Joint** WAMs by generation modality, conditioning, and action-decoding strategy; surveys the data ecosystem and evaluation.
    *Why it matters:* the field map. Use it to **position** the noise→action idea and pull adjacent baselines/citations fast. Read for taxonomy/framing, not method.
 
-**Monday one-liner to have ready:** "LAPO/LAPA/ViPRA all *learn a separate latent action space* (inverse dynamics, VQ-VAE, or flow-supervised). My hypothesis is that a pretrained video diffusion model's **own noise/latent already encodes** that action structure — so the contribution is a *toolbox to read it out*, not another latent-action learner."
+**Monday one-liner to have ready:** "LAPO/LAPA/ViPRA all *learn a separate latent action space* (inverse dynamics, VQ-VAE, or flow-supervised). My hypothesis is that a *frozen* pretrained video model's **own representation already contains** that action structure — in its noise, latent space, or autoregressive rollout — readable either as a static subspace or by **sampling trajectories within it**; so the contribution is a *toolbox to read it out*, not another latent-action learner."
 
 ## Fifty Problems — Third, Passive
 

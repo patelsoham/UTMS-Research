@@ -2,7 +2,16 @@
 
 > **Purpose of this file.** This is the *content* companion to [phase1_priority.md](phase1_priority.md). The priority file is the *plan* (what to study, in what order, why). This file is the *substance* — paper extractions, conceptual teaching, and curated follow-up reading. When you read a paper, its notes go here, not in the planning doc.
 >
-> **Reading frame.** Every note ties back to the project: *unsupervised latent-action recovery from a **frozen** pretrained video diffusion model, by finding the structured subspace of its conditioning noise that parameterizes single-step frame-to-frame transitions.* The two load-bearing claims of the project are (a) the world model Φ stays **frozen**, and (b) the method is **diffusion-specific** because only diffusion exposes a continuous structured noise vector as a first-class input. Keep stress-testing both as you read.
+> **Reading frame.** Every note ties back to the project: *unsupervised recovery of inverse dynamics (action structure) from a **frozen, action-blind** pretrained video model, by analyzing — or sampling trajectories within — whatever **representation** that model exposes: the **conditioning noise** of a diffusion/flow model, the **latent embedding space** of a predictive model (e.g. V-JEPA 2), or an **autoregressive (token) rollout**.* The action signal need **not be directly stored** as a static subspace; the method may instead **sample/traverse trajectories through the representation** and read dynamics from how those trajectories move. Building a **toolbox to understand that representation** (so the mapping is findable at all) is a primary deliverable, not a means to an end. The three load-bearing claims are (a) the world model Φ stays **frozen**; (b) the action structure is **recoverable** from Φ's representation without retraining it — by probing a static subspace *or* sampling trajectories within it; and (c) **scope: Φ is a *pure* video model with no action interface**, *not* a video-model-**plus-action-conditioning** system (Genie's LAM, V-JEPA 2-**AC**, DreamZero's action head all *manufacture* an action space — we *discover* one). Diffusion-noise probing is the **sharpest single instantiation** (a continuous structured noise vector as a first-class input), not the whole project. Keep stress-testing all three claims as you read. *(Full canonical statement: the "Research Problem" block in [phase1_priority.md](phase1_priority.md).)*
+>
+> **How each paper ties to the project (classification rubric).** Tag every deep-dive below with the role(s) it plays, so notes connect to the thesis instead of floating free:
+> - **Proof-of-premise** — demonstrates action structure *is* recoverable from video (validates the bet; *not* something we refute).
+> - **Contrast / baseline** — *manufactures* a latent action space or *fine-tunes* Φ; what we differentiate against on the **discover-vs-manufacture** and **frozen-vs-trained** axes.
+> - **Valid probing target** — an action-blind *frozen checkpoint* we could actually instrument (e.g. Wan2.1-I2V base → noise; base Cosmos → noise/latent; V-JEPA 2 **Stage-1** encoder → latent; a no-LAM AR video model → logits/hidden states).
+> - **Scope boundary / out-of-target** — the action-conditioned *sibling* we must **not** probe (V-JEPA 2-**AC**, Cosmos **Policy**, Genie's co-trained **LAM**); probing these is circular.
+> - **Method tool** — an interpretability/analysis technique we borrow for the toolbox (probing, SAEs, DINO-WM-style frozen-feature planning).
+>
+> A single paper can carry several tags — e.g. **V-JEPA 2** is proof-of-premise (-AC works on a frozen encoder) *and* a valid Stage-1 target *and* a scope boundary (its -AC head is out-of-target).
 
 ---
 
@@ -14,12 +23,12 @@ Definitions you need before the two papers make sense. Read once, refer back as 
 - **VLA — Vision-Language-Action model.** A BC-style policy initialized from a pretrained **Vision-Language Model** (VLM, trained on static image+text). Maps (image, language instruction) → motor action. Inherits *semantic* priors ("what a banana is") but **not** *dynamics* priors ("how an arm moves to grasp it"), because VLMs never saw motion — only still images.
   - **A VLA is built *on top of* a VLM — they are not two separate systems.** Structurally: $\text{VLA} = \underbrace{\text{VLM}}_{\text{web image-text} \to \text{semantics, the }what} + \underbrace{\text{action head}}_{\text{robot demos} \to \text{motion, the }how}$. You take the pretrained VLM (the base "brain" that knows what a coke can is, who Taylor Swift is, what "leftmost" means) and **fine-tune it on robot data** to also emit actions. The "A" is the new part bolted on.
   - **Why the two halves matter.** Each capability is credited to a *different* training source. "A VLA can do *move the coke can to Taylor Swift* **because the VLM knows** who she is" means: the robot data never contained Taylor Swift, so that recognition comes purely from the **VLM half** (web knowledge); the *move* trajectory comes from the **action half** (robot demos). It succeeds only because the two combine.
-  - **Where it breaks.** "Untie the shoelace" fails not because the VLM lacks knowledge (it knows what a shoelace is) but because **untying is a *motion***, and (a) it was never in the robot demos and (b) the VLM cannot supply it — the VLM only ever saw *static images*, never motion. The one thing missing (dynamics) is exactly the one thing web image-text pretraining can never provide. *This is the precise gap DreamZero's video backbone — and your frozen-noise project — aim to fill.*
-- **Inverse Dynamics Model (IDM).** Given two consecutive observations $o_t, o_{t+1}$, predict the action $a_t$ that caused the transition: $a_t \approx \mathrm{IDM}(o_t, o_{t+1})$. This is the conceptual heart of LAPO/LAPA and is *exactly* what your project is trying to read out of the noise vector instead of training a separate module.
+  - **Where it breaks.** "Untie the shoelace" fails not because the VLM lacks knowledge (it knows what a shoelace is) but because **untying is a *motion***, and (a) it was never in the robot demos and (b) the VLM cannot supply it — the VLM only ever saw *static images*, never motion. The one thing missing (dynamics) is exactly the one thing web image-text pretraining can never provide. *This is the precise gap DreamZero's video backbone — and your frozen video-model dynamics project — aim to fill.*
+- **Inverse Dynamics Model (IDM).** Given two consecutive observations $o_t, o_{t+1}$, predict the action $a_t$ that caused the transition: $a_t \approx \mathrm{IDM}(o_t, o_{t+1})$. This is the conceptual heart of LAPO/LAPA and is *exactly* what your project is trying to recover from a frozen model's **representation** — its conditioning noise, latent space, or autoregressive rollout — instead of training a separate module.
 - **Forward Dynamics Model (FDM).** The opposite: given $o_t$ and $a_t$, predict $o_{t+1}$. A video-prediction model is a (very expensive, generative) FDM.
 - **World Model.** Any model that predicts how the world evolves — future states given current state (and optionally action). A video generator is a *pixel-space* world model; a JEPA is a *representation-space* world model.
 - **Diffusion / flow-matching model.** A generative model that turns Gaussian noise into data through iterative denoising. **Flow matching** (the objective both Wan and DreamZero use) is the modern, cleaner cousin of DDPM: it learns a **velocity field** that transports noise $z_0 \sim \mathcal{N}(0,I)$ to data $z_1$ along the straight-line path $z_t = t\,z_1 + (1-t)\,z_0$, with target velocity $v = z_1 - z_0$. *This noise $z_0$ is the object your project wants to probe.*
-- **JEPA — Joint-Embedding Predictive Architecture.** A **non-generative** predictive model. Instead of predicting pixels, it predicts the *learned embedding* of a masked/future part of the input. Crucially: **no pixel reconstruction, no noise vector, no generation.** (This is why V-JEPA 2 is the key counterexample to your project — more below.)
+- **JEPA — Joint-Embedding Predictive Architecture.** A **non-generative** predictive model. Instead of predicting pixels, it predicts the *learned embedding* of a masked/future part of the input. Crucially: **no pixel reconstruction, no noise vector, no generation.** (So the *noise-probing* instantiation doesn't apply to V-JEPA 2 — but under the generalized framing its **latent space is itself a candidate representation** to probe, or to sample trajectories within; see 2.6.)
 - **MPC — Model-Predictive Control.** A planning loop: imagine the consequences of candidate action sequences using a world model, pick the best, execute the first action, observe, re-plan. The "imagining" is where the world model is used.
 - **CEM — Cross-Entropy Method.** A simple black-box optimizer used inside MPC: sample action sequences from a Gaussian, keep the best-scoring ("elite") few, refit the Gaussian to them, repeat. No gradients required.
 
@@ -91,6 +100,8 @@ where $c$ = language instruction, $q_l$ = proprioceptive state, $o$ = observatio
 - Data **diversity** beats data **repetition** at equal hours.
 
 ### 1.6 Ties to your project (read this twice)
+
+> **Rubric role(s):** **Contrast / baseline** (fine-tunes Φ + adds an action head → the *frozen-vs-trained* and *discover-vs-manufacture* foil). Secondary: **valid probing target** via its *base* backbone — Wan2.1-I2V-14B **before** DreamZero's action fine-tuning — which is action-blind. The DreamZero weights themselves are **out-of-target** (action-conditioned).
 
 DreamZero is the **closest architectural neighbor** to your idea, and also the clearest illustration of what you are *not* doing:
 
@@ -166,11 +177,13 @@ $$a^\star_{1:T} = \arg\min_{\hat a_{1:T}}\ \big\| \hat z_T(\hat a_{1:T}) - z_g \
 
 ### 2.6 Ties to your project (this is the important one)
 
-V-JEPA 2 is the **architectural counterexample that bounds your project's scope** — and you should be able to articulate this precisely:
+> **Rubric role(s):** **Proof-of-premise** (a *frozen* encoder + tiny action head plans real robots → "freeze the world model, read actions cheaply" is viable) · **valid probing target** (the **Stage-1** action-blind ViT encoder's latent space) · **scope boundary / out-of-target** (the **Stage-2 -AC** predictor is action-trained → probing it is circular).
 
-- **JEPA has no noise vector to probe.** Your method depends on a diffusion model exposing a continuous structured noise $z_0$ as a first-class input. A JEPA does *not* generate, *does not* sample, and has **no conditioning noise**. So your noise-search method is **architecturally inapplicable** to the entire JEPA family. That is a real limitation of your approach — own it, don't hide it. (It's also why your framing must say "video *diffusion* models," never "video models" generically.)
+V-JEPA 2 is the **non-generative (JEPA-world) instantiation of your project** — it bounds the *noise* instantiation while opening a *latent-space* one — and you should be able to articulate this precisely:
+
+- **JEPA has no noise vector — but it still has a representation.** The *noise-probing* instantiation of your method depends on a diffusion/flow model exposing a continuous structured noise $z_0$ as a first-class input; a JEPA does *not* generate, *does not* sample pixels, and has **no conditioning noise**, so that *specific* probe is inapplicable. **Under the generalized framing this is not a dead end:** V-JEPA 2's frozen **latent space** is itself a candidate representation to analyze — you can probe it for an action subspace, or **sample/traverse trajectories within it** (its action-conditioned predictor literally rolls trajectories forward *in embedding space*) and read dynamics from how those trajectories move. So the JEPA family is **out of scope for the noise instantiation but in scope for the general method**. Be precise about which claim you are making — and note this is exactly why the framing now says "video *models*," not "video *diffusion* models" only.
 - **But V-JEPA 2-AC validates your underlying premise.** It demonstrates that a *frozen* video encoder's representation space already contains enough dynamics structure that a *small* action-conditioned predictor can be bolted on. That is the JEPA-world analog of your claim that a *frozen* diffusion model's noise space already contains action structure. Use V-JEPA 2-AC as **evidence that "freeze the world model, read out actions cheaply" is a viable paradigm** — you are proposing the diffusion-noise version of the same idea.
-- **The efficiency war is your backdrop.** V-JEPA 2's 16 s vs. Cosmos's 4 min, and DreamZero's heroic 38× speedup, both say the same thing: *generating pixels to act is expensive.* Your pitch should pre-empt this — you are **not generating** during deployment; you are doing **latent-space analysis** of a single forward pass's noise structure. Position your method as cheaper than generation-based control, closer in spirit to JEPA's representation-space efficiency, but retaining the diffusion model's explicit, structured, probe-able noise.
+- **The efficiency war is your backdrop.** V-JEPA 2's 16 s vs. Cosmos's 4 min, and DreamZero's heroic 38× speedup, both say the same thing: *generating pixels to act is expensive.* Your pitch should pre-empt this — you are **not generating** during deployment; you are doing **representation-space analysis** of a single forward pass (or a short trajectory sampled within the representation), whether that representation is diffusion noise, a latent embedding, or an autoregressive rollout. Position your method as cheaper than generation-based control, closer in spirit to JEPA's representation-space efficiency, while retaining — in the diffusion instantiation — the model's explicit, structured, probe-able noise.
 
 ---
 
@@ -181,7 +194,7 @@ V-JEPA 2 is the **architectural counterexample that bounds your project's scope*
 | Paradigm | **Generative** (video diffusion / flow matching) | **Non-generative** (JEPA, representation-space) |
 | Predicts | Future **pixels** + actions (jointly) | Future **embeddings** (+ actions in Stage 2) |
 | Backbone | Wan 2.2 image-to-video diffusion, **fine-tuned** | ViT-g encoder, **frozen** after pretraining |
-| Has a noise vector? | **Yes** ($z_0 \sim \mathcal N(0,I)$, flow-matching) ← *your target* | **No** ← *out of scope for your method* |
+| Has a noise vector? | **Yes** ($z_0 \sim \mathcal N(0,I)$, flow-matching) ← *target for the noise instantiation* | **No** — but its **latent space** is a target under the generalized framing |
 | Action mechanism | End-to-end joint denoising, action decoder | Action-conditioned predictor + CEM/MPC planning |
 | Uses actions? | Yes, co-trained (BC-like signal) | Stage 2 uses recorded actions (62 h) |
 | Deployment cost | 7 Hz after 38× optimization (2× GB200) | 16 s/action planning (single RTX 4090) |
@@ -224,7 +237,7 @@ Extracted from both bibliographies and **organized by the taxonomy question you 
 - **Jang et al., 2025 — DreamGen: Unlocking Generalization via Video World Models** (CoRL) — **[DZ]**. Synthetic robot data from video models. (NVIDIA, same group as DreamZero)
 
 ### D. Joint video+action World Action Models (WAMs) — the direct competitors
-*These are exactly the "train a separate action mechanism" baselines your frozen-noise idea aims to bypass.*
+*These are exactly the "train a separate action mechanism" baselines your frozen action-blind probing idea aims to bypass.*
 - **Zhu et al., 2025 — Unified World Models: Coupling Video and Action Diffusion** (arXiv 2504.02792) — **[both]**.
 - **Li et al., 2025 — Unified Video Action Model (UVA)** (arXiv 2503.00200) — **[DZ]**.
 - **Kim et al., 2026 — Cosmos Policy: Fine-tuning Video Models for Visuomotor Control** (arXiv 2601.16163) — **[DZ]**. NVIDIA Cosmos as a policy — relevant since Cosmos was your candidate Φ.
@@ -234,7 +247,7 @@ Extracted from both bibliographies and **organized by the taxonomy question you 
 - **Zheng et al., 2025 — FLARE: Robot Learning with Implicit World Modeling** (arXiv 2505.15659) — **[both]**.
 
 ### E. Predictive-embedding / JEPA world models (the non-generative alternative)
-*The paradigm with no noise vector — read to understand the boundary of your method's applicability.*
+*The paradigm with no noise vector — its **latent space** is the representation you'd probe (or sample trajectories within) under the generalized framing: the JEPA-world instantiation of the project.*
 - **Bardes et al., 2024 — V-JEPA / Revisiting Feature Prediction** (arXiv 2404.08471) — **[both]** (DZ cites the V-JEPA arXiv 2402.05065; VJ cites the Revisiting-Feature-Prediction version). The Stage-1 recipe V-JEPA 2 scales.
 - **Zhou et al., 2024 — DINO-WM: World Models on Pretrained Visual Features → zero-shot planning** (arXiv 2411.04983) — **[VJ]**. **Very close conceptual cousin to your "frozen features → planning" idea, in the JEPA/feature world.**
 - **Tomar et al., 2024 — Video Occupancy Models** (arXiv 2407.09533) — **[VJ]**. Representation-space prediction.
